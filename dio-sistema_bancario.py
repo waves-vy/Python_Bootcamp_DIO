@@ -106,9 +106,7 @@ while True:
         print("\033[1m SEU EXTRATO BANCÁRIO \033[m".center(47, "="))
         print("\nID    Tipo          Valor (R$)\n")
 
-        i = 0
-
-        for type, value in extrato:
+        for i, (type, value) in enumerate(extrato):
             i += 1
             value_str = ""
 
