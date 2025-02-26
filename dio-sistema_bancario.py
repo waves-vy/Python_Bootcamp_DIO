@@ -7,16 +7,19 @@ menu = '''
 => '''
 
 saldo = 0
-limite = 500
 extrato = []
-numero_saques = 0
-LIMITE_SAQUES = 3
+numero_transacoes = 0
+LIMITE_SAQUE = 500
+
+
+
+# OPERAÇÕES
 
 def adicionar_extrato(*transacao):
     global extrato
     extrato.append(transacao)
 
-def transacao_realizada(tipo, valor):
+def comprovante(tipo, valor):
     print()
     print("="*40)
     print()
@@ -24,30 +27,69 @@ def transacao_realizada(tipo, valor):
     print(f"{tipo} realizado com sucesso!".center(40))
     print(f"Valor: \033[1mR$ {valor:.2f}\033[1m".center(47))
 
-while True:
+def sacar(limite_saque, limite_transacoes):
+    global saldo
+    global numero_transacoes
 
-    print()
-    print("\033[1m SUA CONTA \033[m".center(47, "="))
-    print(f"\nSeu saldo: \033[1mR$ {saldo:.2f}\033[m")
+    valor_saque = -1
+    
+    if numero_transacoes < limite_transacoes:
+        while True:
+            print("Informe o valor de saque:")
+            print("[i] O saque máximo é de R$ 500,00")
+            print("[0] Cancelar operação\n")
+                    
+            valor_saque = float(input("=> "))
 
-    opcao = input(menu)
+            if valor_saque > 0:
 
-    print()
+                limite = valor_saque <= limite_saque
+                possui_saldo = valor_saque <= saldo
+                            
+                if limite:
+                    if possui_saldo:
+                        saldo -= valor_saque
+                        numero_transacoes += 1
+                        adicionar_extrato("SAQUE", valor_saque)
+                        comprovante("Saque", valor_saque)
+                        break
 
-    if opcao == "d":
+                    else:
+                        print("\n\033[1;31mSaldo insuficiente.\033[m\n")
+                        continue
 
-        valor_deposito = -1
+                else:
+                    print(f"\n\033[1;31m[!] O valor limite por saque é R$ {limite_saque:.2f}. Reduza o valor!\033[m\n")
+                    continue
+                        
+            elif valor_saque == 0:
+                break
 
-        while valor_deposito != 0:
+            else:
+                print("\n\033[1;31m[!] Digite um valor válido!\033[m\n")
+                continue
+
+    else:
+        print(f"\n\033[1;31m[!] Limite de transações diária atingida ({limite_transacoes}).\nTente novamente amanhã!\033[m")
+
+def depositar(limite_transacoes):
+    global saldo
+    global numero_transacoes
+
+    valor_deposito = -1
+
+    if numero_transacoes < limite_transacoes:
+        while True:
             print("Informe o valor de depósito:\n[0] Cancelar operação\n")
             valor_deposito = float(input("=> "))
 
             if valor_deposito > 0:
                 saldo += valor_deposito
+                numero_transacoes += 1
                 adicionar_extrato("DEPÓSITO", valor_deposito)
-                transacao_realizada("Depósito", valor_deposito)
+                comprovante("Depósito", valor_deposito)
                 break
-                
+                    
             elif valor_deposito == 0:
                 break
 
@@ -55,69 +97,48 @@ while True:
                 print("\n\033[1;31m[!] Digite um valor válido!\033[m\n")
                 continue  
 
-    elif opcao == "s":
+    else:
+        print(f"\n\033[1;31m[!] Limite de transações diária atingida ({limite_transacoes}).\nTente novamente amanhã!\033[m")
 
-        limite_diario = numero_saques < LIMITE_SAQUES
+def exibir_extrato(extrato):
+    print("\033[1m SEU EXTRATO BANCÁRIO \033[m".center(47, "="))
+    print(f"\n{'ID':4}  {'Tipo':<10}  {'Valor (R$)':>13}")
+    print("-".center(40, '-'))
 
-        if limite_diario:
+    for i, (type, value) in enumerate(extrato):
+        i += 1
+        value_str = ""
 
-            valor_saque = -1
-
-            while valor_saque != 0:
-                print("Informe o valor de saque:")
-                print("[i] O saque máximo é de R$ 500,00")
-                print("[0] Cancelar operação\n")
-                
-                valor_saque = float(input("=> "))
-
-                if valor_saque > 0:
-
-                    limite_saque = valor_saque <= limite
-                    possui_saldo = valor_saque <= saldo
-                    
-                    if limite_saque:
-                        if possui_saldo:
-                            saldo -= valor_saque
-                            numero_saques += 1
-                            adicionar_extrato("SAQUE", valor_saque)
-                            transacao_realizada("Saque", valor_saque)
-                            break
-
-                        else:
-                            print("\n\033[1;31mSaldo insuficiente.\033[m\n")
-                            continue
-
-                    else:
-                        print(f"\n\033[1;31m[!] O valor limite por saque é R$ {limite:.2f}. Reduza o valor!\033[m\n")
-                        continue
-                
-                elif valor_saque == 0:
-                    break
-
-                else:
-                    print("\n\033[1;31m[!] Digite um valor válido!\033[m\n")
-                    continue
-
+        if type == "SAQUE":
+            value_str = f"\033[1;31m-{value:.2f}\033[m"
+            print(f"{'%03d' % i:4}  {type:<10}  {value_str:>23}")
         else:
-            print("\n\033[1;31m[!] Limite de saques diário atingido (3).\nTente novamente amanhã!\033[m")
+            value_str = f"\033[1m{value:.2f}\033[m"
+            print(f"{'%03d' % i:4}  {type:<10}  {value_str:>20}")
+
+    print("-".center(40, '-'))
+    print(f"Saldo atual:\033[1m{saldo:>19.2f}\033[m")
 
 
-    elif opcao == "e":
-        print("\033[1m SEU EXTRATO BANCÁRIO \033[m".center(47, "="))
-        print("\nID    Tipo          Valor (R$)\n")
 
-        for i, (type, value) in enumerate(extrato):
-            i += 1
-            value_str = ""
+# INTERFACE
 
-            if type == "SAQUE":
-                value_str = f"\033[1;31m-{value:.2f}\033[m"
-                print(f"{'%02d' % i:5} {type:<10} {value_str:>23}")
-            else:
-                value_str = f"\033[1m{value:.2f}\033[m"
-                print(f"{'%02d' % i:5} {type:<10} {value_str:>20}")
+while True:
 
-        print(f"\nSaldo atual: R$ \033[1m{saldo:.2f}\033[m")
+    print()
+    print("\033[1m SUA CONTA \033[m".center(47, "="))
+    print(f"\nSeu saldo: \033[1mR$ {saldo:.2f}\033[m")
+    opcao = input(menu)
+    print()
+
+    if opcao == "d": #DEPÓSITO
+        depositar(limite_transacoes=10)
+
+    elif opcao == "s": #SAQUE
+        sacar(limite_saque=500, limite_transacoes=10)
+            
+    elif opcao == "e": #EXTRATO
+        exibir_extrato(extrato)
 
     elif opcao == "q":
         break
