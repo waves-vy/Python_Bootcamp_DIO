@@ -1,48 +1,94 @@
-#SISTEMA BANCÁRIO
+from datetime import datetime, date
 
-# UTILIDADE: CABEÇALHOS E DIVISÕES
+# FORMATAÇÃO
+largura = 50
+
+def printjus(msg, distancia=largura):
+    if len(msg) > 1:
+        for conjunto in msg:
+            distancia -= len(conjunto)
+
+        distancia = distancia // (len(msg) - 1)
+        msg_str = ""
+
+        for i, conjunto in enumerate(msg):
+            msg_str += conjunto
+            if i < len(msg):
+                msg_str += (" "*distancia)
+
+        print(msg_str)
 
 def merror(msg):
     print(f"\n\033[1;31m[!] {msg}\033[m\n")
 
-def hr(tipo):
-    if tipo == 1:
-        print()
-        print("\033[1m=\033[m"*47)
-        print()
-
-    elif tipo == 2:
-        print("-"*47)
+def msucesso(msg):
+    print(f"\033[1m[✓] {msg}\033[m".center(largura+5))
+    print()
 
 def header(msg):
     msg=msg.upper()
     hr(1)
-    print(f"\033[1m {msg} \033[m".center(54, " "))
+    print(f"\033[1m{msg}\033[m".center(largura+5))
     print()
 
-def msucesso(msg):
-    print(f"\033[1m[✓] {msg}\033[m".center(52))
+def h2(msg):
     print()
+    print(f"{msg.upper()}".center(largura))
+    print()
+
+def hr(tipo):
+    if tipo == 1:
+        print()
+        print("\033[1m=\033[m"*largura)
+        print()
+
+    elif tipo == 2:
+        print("-"*largura)
 
 
 
 # OPERAÇÕES BANCÁRIAS
+def qtd_transacoes_hoje(extrato):
+    transacoes_hoje = 0
+    hoje = date.today().strftime("%d/%m/%y")
 
-def adicionar_extrato(conta, valor):
-    conta["extrato"].append({"data": "00-00-0000", "valor": valor})
+    for transacao in extrato["extrato"]:
+        data_transacao = transacao["data_hora"].split(" ")
+        if data_transacao[0] == hoje:
+            transacoes_hoje += 1
 
-    if valor > 0:
-        comprovante("Depósito", valor)
-    else:
-        comprovante("Saque", valor)
+    return transacoes_hoje
 
-def comprovante(tipo, valor):
+def adicionar_extrato(conta, valor, cliente, transacoes):
+    data_hora = datetime.now().strftime("%d/%m/%y %H:%M:%S")
+    conta["extrato"].append({"data_hora": data_hora, "valor": valor})
+    tipo = "Depósito" if valor > 0 else "Saque" 
+    comprovante(conta, cliente, tipo, valor, data_hora, transacoes)
+
+def comprovante(conta, cliente, tipo, valor, data_hora, transacoes):
     hr(1)
-    print(f"{tipo} realizado com sucesso!".center(47))
-    print(f"Valor: \033[1mR$ {valor:.2f}\033[1m".center(53))
+    msucesso(f"{tipo} realizado com sucesso! [{transacoes[0]+1}/{transacoes[1]}]")
+    hr(2)
 
-def sacar(conta, limite_transacoes, transacoes_feitas, limite_saque):
+    h2(f"COMPROVANTE DE {tipo}")
+
+    data_hora = data_hora.split(" ")
+    data = data_hora[0]
+    hora = data_hora[1]
+
+    printjus((
+        f"CPF: {cliente["cpf"]}",
+        f"Agência: {conta["agencia"]}",
+        f"C/C: {conta["numero_conta"]}"
+    ))
+    printjus(("Cliente:", f"{cliente["nome"]}"))
+    print()
+    printjus((f"Valor: R$ {valor:.2f}", data, hora))
+
+def sacar(conta, cliente, limite_transacoes, limite_saque):
     valor_saque = -1
+
+    transacoes_feitas = qtd_transacoes_hoje(conta)
 
     if transacoes_feitas < limite_transacoes:
         while True:
@@ -60,23 +106,24 @@ def sacar(conta, limite_transacoes, transacoes_feitas, limite_saque):
                 if limite:
                     if possui_saldo:
                         conta["saldo"] -= valor_saque
-                        transacoes_feitas += 1
                         adicionar_extrato(
                             conta=conta,
+                            cliente=cliente,
                             valor=-valor_saque, 
+                            transacoes=(transacoes_feitas, limite_transacoes)
                         )
-                        break
+                        return 1
 
                     else:
-                        print("\n\033[1;31mSaldo insuficiente.\033[m\n")
+                        merror("Saldo insuficiente")
                         continue
 
                 else:
-                    print(f"\n\033[1;31m[!] O valor limite por saque é R$ {limite_saque:.2f}. Reduza o valor!\033[m\n")
+                    merror(f"O valor limite por saque é R$ {limite_saque:.2f}. Reduza o valor!")
                     continue
                         
             elif valor_saque == 0:
-                break
+                return 0
 
             else:
                 merror("Digite um valor válido!")
@@ -84,9 +131,11 @@ def sacar(conta, limite_transacoes, transacoes_feitas, limite_saque):
 
     else:
         print(f"\n\033[1;31m[!] Limite de transações diária atingida ({limite_transacoes}).\nTente novamente amanhã!\033[m")
+        return 0
 
-def depositar(conta, limite_transacoes, transacoes_feitas):
+def depositar(conta, cliente, limite_transacoes):
     valor_deposito = -1
+    transacoes_feitas = qtd_transacoes_hoje(conta)
 
     if transacoes_feitas < limite_transacoes:
         while True:
@@ -95,46 +144,57 @@ def depositar(conta, limite_transacoes, transacoes_feitas):
 
             if valor_deposito > 0:
                 conta["saldo"] += valor_deposito
-                transacoes_feitas += 1
                 adicionar_extrato(
                     conta=conta,
-                    valor=valor_deposito, 
+                    cliente=cliente,
+                    valor=valor_deposito,
+                    transacoes=(transacoes_feitas, limite_transacoes) 
                 )
-                break
+                return 1
                     
             elif valor_deposito == 0:
-                break
+                return 0
 
             else:
                 merror("Digite um valor válido!")
                 continue  
 
     else:
-        print(f"\n\033[1;31m[!] Limite de transações diária atingida ({limite_transacoes}).\nTente novamente amanhã!\033[m")
+        merror(f"Limite de transações diária atingida ({limite_transacoes}).\nTente novamente amanhã!")
+        return 0
 
-def exibir_extrato(conta):
+def exibir_extrato(conta, usuario):
     header("SEU EXTRATO BANCÁRIO")
-    print(f"\n{'ID':5} {'Data':<12} {'Tipo':<10} {'Valor (R$)':>13}")
+
+    printjus((f"Cliente:", usuario["nome"]))
+    printjus((f"CPF: {usuario["cpf"]}",
+                f"Agência: {conta["agencia"]}",
+                f"C/C: {conta["numero_conta"]}"
+    ))     
+
+    print(f"\n\033[1m{'ID':3} {'Data':<8} {'Hora':<10} {'Tipo':<10} {'Valor (R$)':>15}\033[m")
     hr(2)
 
     extrato = conta["extrato"]
     saldo = conta["saldo"]
 
     for i, dados in enumerate(extrato):
-        data = dados['data']
-        valor = dados['valor']
+        data = dados["data_hora"]
+        valor = dados["valor"]
         i += 1
+
         valor_str = ""
+        tipo = ""
 
         if valor < 0:
             valor_str = f"\033[1;31m{valor:.2f}\033[m"
-            print(f"{'%03d' % i:5} {data:<12} {"SAQUE":<10} {valor_str:>23}")
+            print(f"{'%02d' % i:3} {data:<19} {"SAQUE":<10} {valor_str:>25}")
         else:
             valor_str = f"\033[1m{valor:.2f}\033[m"
-            print(f"{'%03d' % i:5} {data:<12} {"DEPÓSITO":<10} {valor_str:>20}")
+            print(f"{'%02d' % i:3} {data:<19} {"DEPÓSITO":<10} {valor_str:>22}")
 
     hr(2)
-    print(f"{"Saldo atual:":>31}\033[1m{saldo:>12.2f}\033[m")
+    print(f"{"Saldo atual:":>31}\033[1m{saldo:>19.2f}\033[m")
 
 
 
@@ -207,7 +267,7 @@ def selecionar_conta(usuario, contas):
                     existe_conta = conta
 
             if existe_conta:
-                return conta
+                return existe_conta
 
             elif opcao == "c":
                 criar_conta(
@@ -244,8 +304,6 @@ def conta_usuario(usuario, conta):
     limite_transacoes = 10
 
     while True:
-        transacoes_feitas = 0
-
         nome = usuario["nome"].split(" ")
         
         if len(nome) > 1:
@@ -257,27 +315,26 @@ def conta_usuario(usuario, conta):
         print(f"Bem vindo, \033[1m{nome}\033[m")
         print(f"Agência: {conta["agencia"]}   C/C: {conta["numero_conta"]}")
         print(f"\nSeu saldo: \033[1mR$ {conta["saldo"]:.2f}\033[m")
-        print(f"Transações: {transacoes_feitas}/{limite_transacoes}")
         opcao = menu()
         print()
 
         if opcao == "d": #DEPÓSITO
             depositar(
                 conta=conta, 
-                limite_transacoes=limite_transacoes, 
-                transacoes_feitas=transacoes_feitas
+                cliente=usuario,
+                limite_transacoes=limite_transacoes
             )
 
         elif opcao == "s": #SAQUE
             sacar(
                 conta=conta, 
+                cliente=usuario,
                 limite_transacoes=limite_transacoes, 
-                transacoes_feitas=transacoes_feitas,
                 limite_saque=limite_saque
             )
-                
+                                    
         elif opcao == "e": #EXTRATO
-            exibir_extrato(conta=conta)
+            exibir_extrato(conta=conta, usuario=usuario)
 
         elif opcao == "x":
             break
@@ -294,7 +351,6 @@ def main():
     usuarios.append({"nome": "Victor Yuri Gomes Cordeiro", "cpf": "61674422318", "nascimento": "15-07-2003", "endereco": None})
     contas.append({"agencia": "0001", "numero_conta": 1, "usuario": "61674422318", "saldo": 0, "extrato": []})
 
-    numero_transacoes = 0
     LIMITE_SAQUE = 500
 
     while True:
@@ -314,7 +370,7 @@ def main():
 
         else:
             merror("Usuário não cadastrado!")
-            print("Deseja criar uma conta? [s] Sim  [any key] Não\n")
+            print("Deseja criar um cadastro? [s] Sim  [any key] Não\n")
 
             criar_usuario = input("=> ")
             print()
